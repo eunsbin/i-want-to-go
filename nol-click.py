@@ -73,10 +73,17 @@ def current_mouse_pos() -> tuple[int, int]:
 
 def make_click(x: int, y: int):
     cg = _load_cg()
+    cf = ctypes.CDLL(ctypes.util.find_library("CoreFoundation"))
+    cf.CFRelease.argtypes = [ctypes.c_void_p]
 
     pt = CGPoint(float(x), float(y))
     down = cg.CGEventCreateMouseEvent(None, 1, pt, 0)  # kCGEventLeftMouseDown
     up = cg.CGEventCreateMouseEvent(None, 2, pt, 0)    # kCGEventLeftMouseUp
+
+    for _ in range(5):
+        warm = cg.CGEventCreateMouseEvent(None, 5, pt, 0)  # kCGEventMouseMoved
+        cg.CGEventPost(0, warm)
+        cf.CFRelease(warm)
 
     def fire() -> None:
         cg.CGEventPost(0, down)
