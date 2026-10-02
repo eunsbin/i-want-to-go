@@ -26,6 +26,8 @@ import sys
 import time
 from datetime import datetime, timezone, timedelta
 
+from ssl_context import die_on_ssl_verify_error, ssl_context
+
 KST = timezone(timedelta(hours=9))
 TIME_HOST = "time.app.fans"
 
@@ -77,10 +79,13 @@ def make_click(x: int, y: int):
 # ---------------------------------------------------------------- 서버 시간 (time.app.fans)
 
 def open_conn() -> http.client.HTTPSConnection:
-    conn = http.client.HTTPSConnection(TIME_HOST, timeout=3, context=ssl.create_default_context())
-    conn.request("GET", "/", headers={"Cache-Control": "no-store"})
-    conn.getresponse().read()
-    return conn
+    try:
+        conn = http.client.HTTPSConnection(TIME_HOST, timeout=3, context=ssl_context())
+        conn.request("GET", "/", headers={"Cache-Control": "no-store"})
+        conn.getresponse().read()
+        return conn
+    except ssl.SSLCertVerificationError as exc:
+        die_on_ssl_verify_error(exc)
 
 
 def fetch_epoch_ms(conn: http.client.HTTPSConnection) -> tuple[int, float, float]:

@@ -9,6 +9,14 @@
 
 ## Prerequisite
 
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+`truststore`는 macOS Keychain을 써서 curl/Safari와 같은 CA를 신뢰합니다. Anaconda·Homebrew Python 모두 회사망 SSL 검사 시 `CERTIFICATE_VERIFY_FAILED`가 날 수 있습니다.
+
 접근성 권한 허용 필요
 
 ```

@@ -25,6 +25,8 @@ import sys
 import time
 from datetime import datetime, timezone, timedelta
 
+from ssl_context import die_on_ssl_verify_error, ssl_context
+
 KST = timezone(timedelta(hours=9))
 
 # nol.yanolja.com 예매 버튼 → tickets.interpark.com/gates/partner (GATE_PAGE_ORIGIN)
@@ -95,9 +97,12 @@ def make_click(x: int, y: int):
 # ---------------------------------------------------------------- 서버 시간 (interpark BFF)
 
 def open_conn() -> http.client.HTTPSConnection:
-    conn = http.client.HTTPSConnection(TIME_HOST, timeout=3, context=ssl.create_default_context())
-    fetch_epoch_ms(conn)  # TLS 핸드셰이크 미리 끝내두기 (첫 요청만 RTT ~50ms)
-    return conn
+    try:
+        conn = http.client.HTTPSConnection(TIME_HOST, timeout=3, context=ssl_context())
+        fetch_epoch_ms(conn)  # TLS 핸드셰이크 미리 끝내두기 (첫 요청만 RTT ~50ms)
+        return conn
+    except ssl.SSLCertVerificationError as exc:
+        die_on_ssl_verify_error(exc)
 
 
 def fetch_epoch_ms(conn: http.client.HTTPSConnection) -> tuple[int, float, float]:
