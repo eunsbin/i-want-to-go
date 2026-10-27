@@ -79,12 +79,22 @@ def make_click(x: int, y: int):
     pt = CGPoint(float(x), float(y))
     down = cg.CGEventCreateMouseEvent(None, 1, pt, 0)  # kCGEventLeftMouseDown
     up = cg.CGEventCreateMouseEvent(None, 2, pt, 0)    # kCGEventLeftMouseUp
+    move = cg.CGEventCreateMouseEvent(None, 5, pt, 0)  # kCGEventMouseMoved
 
-    def fire() -> None:
+    def warm() -> None:
+        """커서를 클릭 좌표로 미리 이동. 프로세스 첫 CGEventPost만 ~13–18ms 걸려서
+        :00 클릭 전에 한 번 보내둔다 (이후 전송은 ~0.05ms)."""
+        cg.CGEventPost(0, move)
+
+    def fire() -> tuple[float, float, float]:
+        """(down 송신 직전, down 반환, up 반환) monotonic 시각"""
+        t0 = time.monotonic()
         cg.CGEventPost(0, down)
+        t1 = time.monotonic()
         cg.CGEventPost(0, up)
+        return t0, t1, time.monotonic()
 
-    return fire
+    return warm, fire
 
 
 # ---------------------------------------------------------------- 서버 시간 (interpark BFF)
@@ -174,7 +184,8 @@ def main() -> None:
     x, y = current_mouse_pos()
     target_ts = datetime.strptime(target_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=KST).timestamp()
 
-    fire = make_click(x, y)
+    warm, fire = make_click(x, y)
+    warm()
     conn = open_conn()
 
     epoch_ms, _, _ = fetch_epoch_ms(conn)
@@ -190,15 +201,21 @@ def main() -> None:
     conn.close()
 
     deadline = target_ts - offset
+    warm()
 
     gc.disable()
     print("[클릭] :00 발사", flush=True)
     spin_until_mono(deadline)
-    fire()
+    t_down, t_down_ret, t_up_ret = fire()
     gc.enable()
 
-    print(f"클릭 완료: {datetime.now(KST).strftime('%H:%M:%S.%f')[:-3]} "
-          f"(서버 기준 약 {(time.monotonic() + offset - target_ts) * 1000:+.0f}ms)")
+    def ms(t: float) -> str:
+        return f"{(t - deadline) * 1000:+.2f}ms"
+
+    print(f"클릭 완료: {datetime.now(KST).strftime('%H:%M:%S.%f')[:-3]}")
+    print(f"  down 송신  {ms(t_down)}  (서버 :00 기준)")
+    print(f"  down 반환  {ms(t_down_ret)}  (down {(t_down_ret - t_down) * 1000:.2f}ms 소요)")
+    print(f"  up 반환    {ms(t_up_ret)}  (up {(t_up_ret - t_down_ret) * 1000:.2f}ms 소요)")
 
 
 if __name__ == "__main__":
